@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trending Content Engine — Architecture Fonctionnelle V2</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sourcing: #0F766E;
+    --sourcing-bg: #F0FDFA;
+    --sourcing-border: #99F6E4;
+    --preprocessing: #7C3AED;
+    --preprocessing-bg: #FAF5FF;
+    --preprocessing-border: #DDD6FE;
+    --scoring: #DC2626;
+    --scoring-bg: #FFF1F2;
+    --scoring-border: #FECDD3;
+    --generation: #EA580C;
+    --generation-bg: #FFF7ED;
+    --generation-border: #FED7AA;
+    --interface: #2563EB;
+    --interface-bg: #EFF6FF;
+    --interface-border: #BFDBFE;
+    --feedback: #059669;
+    --feedback-bg: #ECFDF5;
+    --feedback-border: #A7F3D0;
+    --slate-900: #0F172A;
+    --slate-800: #1E293B;
+    --slate-700: #334155;
+    --slate-600: #475569;
+    --slate-500: #64748B;
+    --slate-400: #94A3B8;
+    --slate-300: #CBD5E1;
+    --slate-200: #E2E8F0;
+    --slate-100: #F1F5F9;
+    --slate-50: #F8FAFC;
+    --uc-new: #D946EF;
+    --uc-new-bg: #FDF4FF;
+    --uc-new-border: #F0ABFC;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--slate-50) 0%, var(--slate-100) 50%, var(--slate-200) 100%);
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+    color: var(--slate-700);
+    padding: 32px 24px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; }
+
+  /* ── Header ── */
+  .header { text-align: center; margin-bottom: 40px; }
+  .header-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--slate-400); margin-bottom: 8px;
+  }
+  .header h1 {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: clamp(28px, 4vw, 36px); font-weight: 700;
+    color: var(--slate-900); line-height: 1.2;
+  }
+  .header p {
+    color: var(--slate-500); font-size: 15px; margin-top: 10px;
+    max-width: 750px; margin-left: auto; margin-right: auto; line-height: 1.6;
+  }
+  .header-actions { margin-top: 16px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .btn-header {
+    padding: 8px 20px; border-radius: 8px; border: 1px solid var(--slate-300);
+    background: #FFF; cursor: pointer; font-size: 12px; font-weight: 600;
+    color: var(--slate-600); font-family: 'DM Sans', sans-serif;
+    transition: all .2s;
+  }
+  .btn-header:hover { background: var(--slate-100); border-color: var(--slate-400); }
+  .version-badge {
+    display: inline-block; background: var(--uc-new); color: #FFF;
+    font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 12px;
+    letter-spacing: 0.05em; margin-left: 8px; vertical-align: middle;
+  }
+
+  /* ── Flow Bar ── */
+  .flow-bar {
+    display: flex; justify-content: center; align-items: center;
+    gap: 8px; margin-bottom: 28px; flex-wrap: wrap;
+  }
+  .flow-pill {
+    color: #FFF; font-size: 11px; font-weight: 700;
+    padding: 5px 12px; border-radius: 20px; white-space: nowrap;
+    cursor: pointer; transition: transform .15s, box-shadow .15s;
+    user-select: none;
+  }
+  .flow-pill:hover { transform: scale(1.08); box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+  .flow-arrow { color: var(--slate-400); font-size: 16px; font-weight: 700; }
+
+  /* ── Personas Section ── */
+  .personas-section {
+    margin-bottom: 28px; background: #FFF; border-radius: 16px;
+    padding: 24px; border: 1px solid var(--slate-200);
+  }
+  .personas-title {
+    font-weight: 700; font-size: 14px; letter-spacing: 0.03em;
+    text-transform: uppercase; color: var(--slate-600); margin-bottom: 16px;
+  }
+  .personas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+    gap: 12px;
+  }
+  .persona-card {
+    border-radius: 12px; padding: 16px; border: 1px solid var(--slate-200);
+    background: var(--slate-50); position: relative;
+  }
+  .persona-card.is-new {
+    border-color: var(--uc-new-border);
+    background: var(--uc-new-bg);
+  }
+  .persona-card.is-new::before {
+    content: 'NOUVEAU'; position: absolute; top: 10px; right: 10px;
+    background: var(--uc-new); color: #FFF; font-size: 9px; font-weight: 700;
+    padding: 2px 8px; border-radius: 8px; letter-spacing: 0.08em;
+  }
+  .persona-icon { font-size: 24px; margin-bottom: 6px; }
+  .persona-name { font-weight: 700; font-size: 13px; color: var(--slate-900); }
+  .persona-uc { font-size: 10px; font-weight: 600; color: var(--slate-400); margin-top: 2px; font-family: 'DM Mono', monospace; }
+  .persona-desc { font-size: 12px; color: var(--slate-500); margin-top: 6px; line-height: 1.5; }
+  .persona-needs { margin-top: 8px; }
+  .persona-need-tag {
+    display: inline-block; font-size: 10px; padding: 2px 8px;
+    border-radius: 4px; margin: 2px 3px 2px 0; font-weight: 500;
+  }
+
+  /* ── Domain Cards ── */
+  .domain-card {
+    border-radius: 16px; margin-bottom: 16px; overflow: hidden;
+    transition: box-shadow .3s ease;
+  }
+  .domain-card.expanded { box-shadow: 0 8px 32px rgba(0,0,0,.08); }
+  .domain-header {
+    width: 100%; padding: 20px 24px; background: none; border: none;
+    cursor: pointer; display: flex; align-items: center; gap: 16px;
+    text-align: left; font-family: 'DM Sans', sans-serif;
+  }
+  .domain-icon { font-size: 32px; flex-shrink: 0; }
+  .domain-title {
+    font-weight: 700; font-size: 15px; letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .domain-subtitle {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 13px; color: var(--slate-500); margin-top: 2px;
+  }
+  .domain-chevron {
+    font-size: 20px; transition: transform .3s ease; flex-shrink: 0;
+  }
+  .domain-card.expanded .domain-chevron { transform: rotate(180deg); }
+
+  .domain-body { padding: 0 24px 24px; display: none; }
+  .domain-card.expanded .domain-body { display: block; animation: fadeSlide .3s ease; }
+
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .blocks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+  }
+  .block-card {
+    background: #FFF; border-radius: 12px; padding: 18px;
+    transition: transform .15s; position: relative;
+  }
+  .block-card:hover { transform: translateY(-2px); }
+  .block-card.is-new-block { box-shadow: 0 0 0 2px var(--uc-new); }
+  .block-card.is-new-block::after {
+    content: '★ NOUVEAU UC16-18'; position: absolute; top: 8px; right: 8px;
+    background: var(--uc-new); color: #FFF; font-size: 8px; font-weight: 700;
+    padding: 2px 6px; border-radius: 6px; letter-spacing: 0.05em;
+  }
+  .block-card.is-updated-block { box-shadow: 0 0 0 2px #F59E0B; }
+  .block-card.is-updated-block::after {
+    content: '↑ MAJ UC16-18'; position: absolute; top: 8px; right: 8px;
+    background: #F59E0B; color: #FFF; font-size: 8px; font-weight: 700;
+    padding: 2px 6px; border-radius: 6px; letter-spacing: 0.05em;
+  }
+  .block-name {
+    font-weight: 700; font-size: 13px; margin-bottom: 10px;
+    padding-bottom: 8px;
+  }
+  .tech-tag {
+    display: inline-block; font-size: 11.5px;
+    font-family: 'DM Mono', 'Fira Code', monospace; font-weight: 500;
+    padding: 4px 10px; border-radius: 6px; margin: 2px 4px 2px 0;
+  }
+  .tech-tag.is-new-tag {
+    background: #D946EF18 !important; color: #D946EF !important;
+    border: 1px solid #D946EF44 !important; font-weight: 700;
+  }
+  .block-note {
+    font-size: 11.5px; color: var(--slate-500); font-style: italic;
+    line-height: 1.5; margin-top: 10px;
+  }
+  .domain-output {
+    margin-top: 14px; padding: 10px 16px; border-radius: 8px;
+    font-size: 12px; font-weight: 600;
+    border-left-width: 4px; border-left-style: solid;
+  }
+
+  /* ── Orchestration ── */
+  .orchestration {
+    margin-top: 24px;
+    background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+    border-radius: 16px; padding: 24px; color: #FFF;
+  }
+  .orch-header {
+    width: 100%; background: none; border: none; cursor: pointer;
+    display: flex; align-items: center; gap: 16px; text-align: left;
+    color: #FFF; padding: 0; font-family: 'DM Sans', sans-serif;
+  }
+  .orch-title {
+    font-weight: 700; font-size: 15px; letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .orch-note { font-size: 13px; color: var(--slate-400); margin-top: 2px; }
+  .orch-chevron { font-size: 20px; transition: transform .3s ease; }
+  .orch-body {
+    display: none; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px; margin-top: 20px;
+  }
+  .orchestration.expanded .orch-body { display: grid; animation: fadeSlide .3s ease; }
+  .orchestration.expanded .orch-chevron { transform: rotate(180deg); }
+  .orch-card {
+    background: rgba(255,255,255,0.08); border-radius: 12px;
+    padding: 18px; border: 1px solid rgba(255,255,255,0.12);
+    transition: background .2s;
+  }
+  .orch-card:hover { background: rgba(255,255,255,0.12); }
+  .orch-card h3 { font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+  .orch-card p { font-size: 12.5px; color: var(--slate-400); line-height: 1.6; }
+
+  /* ── MVP Phasing ── */
+  .mvp-section {
+    margin-top: 24px; background: #FFF; border-radius: 16px;
+    padding: 24px; border: 1px solid var(--slate-200);
+  }
+  .mvp-title {
+    font-weight: 700; font-size: 14px; letter-spacing: 0.03em;
+    text-transform: uppercase; color: var(--slate-600); margin-bottom: 16px;
+  }
+  .mvp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+  }
+  .mvp-card { border-radius: 12px; padding: 18px; }
+  .mvp-card h3 { font-weight: 700; font-size: 13px; margin-bottom: 12px; }
+  .mvp-item {
+    font-size: 12.5px; color: var(--slate-600); padding: 4px 0;
+    display: flex; align-items: flex-start; gap: 8px; line-height: 1.5;
+  }
+  .mvp-item.is-new-item { color: var(--uc-new); font-weight: 600; }
+  .mvp-bullet { font-weight: 700; flex-shrink: 0; }
+
+  /* ── Relations Diagram ── */
+  .relations-section {
+    margin-top: 24px; background: #FFF; border-radius: 16px;
+    padding: 24px; border: 1px solid var(--slate-200);
+  }
+  .relations-title {
+    font-weight: 700; font-size: 14px; letter-spacing: 0.03em;
+    text-transform: uppercase; color: var(--slate-600); margin-bottom: 20px;
+  }
+  .relations-diagram {
+    display: flex; flex-direction: column; gap: 0; align-items: center;
+  }
+  .rel-row {
+    display: flex; align-items: center; gap: 12px; width: 100%; max-width: 800px;
+  }
+  .rel-box {
+    flex: 1; border-radius: 10px; padding: 14px 18px; text-align: center;
+    font-weight: 700; font-size: 12px; color: #FFF; letter-spacing: 0.02em;
+    position: relative;
+  }
+  .rel-box small { display: block; font-weight: 400; opacity: .85; margin-top: 2px; font-size: 10px; }
+  .rel-connector {
+    text-align: center; padding: 4px 0; color: var(--slate-400);
+    font-size: 18px; font-weight: 700; width: 100%; max-width: 800px;
+  }
+  .rel-side-arrows {
+    display: flex; justify-content: space-between; width: 100%; max-width: 800px;
+    padding: 0 20px; color: var(--slate-400); font-size: 11px; font-weight: 600;
+  }
+  .rel-feedback-loop {
+    border: 2px dashed var(--feedback); border-radius: 12px;
+    padding: 10px 20px; color: var(--feedback); font-size: 11px;
+    font-weight: 600; text-align: center; max-width: 800px; width: 100%;
+    margin-top: 4px;
+  }
+
+  /* ── UC Impact Map ── */
+  .impact-section {
+    margin-top: 24px; background: var(--uc-new-bg); border-radius: 16px;
+    padding: 24px; border: 2px solid var(--uc-new-border);
+  }
+  .impact-title {
+    font-weight: 700; font-size: 14px; letter-spacing: 0.03em;
+    text-transform: uppercase; color: var(--uc-new); margin-bottom: 6px;
+  }
+  .impact-subtitle {
+    font-size: 13px; color: var(--slate-500); margin-bottom: 18px; line-height: 1.5;
+  }
+  .impact-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px;
+  }
+  .impact-card {
+    background: #FFF; border-radius: 10px; padding: 16px;
+    border: 1px solid var(--uc-new-border);
+  }
+  .impact-card-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  }
+  .impact-domain-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  }
+  .impact-domain-name { font-weight: 700; font-size: 12px; color: var(--slate-700); }
+  .impact-changes { font-size: 11.5px; color: var(--slate-600); line-height: 1.6; }
+  .impact-changes li { margin-bottom: 4px; }
+  .impact-uc-badge {
+    display: inline-block; font-size: 9px; font-weight: 700;
+    padding: 1px 6px; border-radius: 4px; margin-left: 4px;
+    vertical-align: middle;
+  }
+  .uc16 { background: #8B5CF620; color: #7C3AED; }
+  .uc17 { background: #3B82F620; color: #2563EB; }
+  .uc18 { background: #F5920B20; color: #EA580C; }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 20px; text-align: center; font-size: 11px;
+    color: var(--slate-400); font-style: italic;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    body { padding: 16px 12px; }
+    .domain-header { padding: 16px; }
+    .domain-body { padding: 0 16px 16px; }
+    .blocks-grid { grid-template-columns: 1fr; }
+    .personas-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-label">Trending Content Engine — Architecture Fonctionnelle <span class="version-badge">V2 — 6 PERSONAS</span></div>
+    <h1>Vue d'ensemble de la solution</h1>
+    <p>6 domaines fonctionnels interconnectés — du signal brut à l'opportunité éditoriale actionnable.<br>
+    Intègre désormais les <strong>3 personas Influenceurs B2B & Solopreneurs</strong> (UC16, UC17, UC18) en plus des 3 personas média originaux.</p>
+    <div class="header-actions">
+      <button class="btn-header" onclick="expandAll()">Tout déplier</button>
+      <button class="btn-header" onclick="collapseAll()">Tout replier</button>
+      <button class="btn-header" onclick="highlightNew()" style="border-color:var(--uc-new);color:var(--uc-new)">★ Voir les nouveautés UC16-18</button>
+    </div>
+  </div>
+
+  <!-- Personas Section -->
+  <div class="personas-section">
+    <div class="personas-title">👥 Personas cibles — 6 profils utilisateurs</div>
+    <div class="personas-grid" id="personasGrid"></div>
+  </div>
+
+  <!-- Flow Bar -->
+  <div class="flow-bar" id="flowBar"></div>
+
+  <!-- Domain Cards -->
+  <div id="domainCards"></div>
+
+  <!-- UC Impact Map -->
+  <div class="impact-section">
+    <div class="impact-title">★ Carte d'impact — Nouveaux cas d'usage UC16 · UC17 · UC18</div>
+    <div class="impact-subtitle">Synthèse des évolutions apportées par les 3 personas Influenceurs B2B & Solopreneurs sur chaque domaine fonctionnel.</div>
+    <div class="impact-grid" id="impactGrid"></div>
+  </div>
+
+  <!-- Relations Diagram -->
+  <div class="relations-section">
+    <div class="relations-title">🔗 Articulation des domaines — Flux de données & relations</div>
+    <div class="relations-diagram">
+      <div class="rel-row">
+        <div class="rel-box" style="background:var(--sourcing)">📡 Sourcing<small>APIs, RSS, Scraping + ArXiv, GitHub, Substack, LI</small></div>
+      </div>
+      <div class="rel-connector">▼ données brutes (signaux mainstream + signaux faibles niche)</div>
+      <div class="rel-row">
+        <div class="rel-box" style="background:var(--preprocessing)">🧹 Pré-processing<small>Airtable / Supabase + classification niche IA/Tech</small></div>
+      </div>
+      <div class="rel-connector">▼ trends nettoyées + enrichies (niche tags, monetization signals)</div>
+      <div class="rel-row">
+        <div class="rel-box" style="background:var(--scoring)">🎯 Scoring IA<small>LLM Agent + Règles + Monetization Scorer + First-Mover Index</small></div>
+      </div>
+      <div class="rel-side-arrows">
+        <span>▼ trends scorées (editorial + monetization)</span>
+        <span>▸ brouillons demandés (multi-format)</span>
+      </div>
+      <div class="rel-row" style="gap:14px">
+        <div class="rel-box" style="background:var(--interface)">🖥️ Interface<small>6 vues persona dont Solopreneur Cockpit</small></div>
+        <div class="rel-box" style="background:var(--generation)">✍️ Génération<small>Newsletter, Framework, Template + formats classiques</small></div>
+      </div>
+      <div class="rel-connector">▼ décisions & feedback (+ métriques monétisation)</div>
+      <div class="rel-row">
+        <div class="rel-box" style="background:var(--feedback)">🔄 Feedback<small>Engagement, revenus, abonnés + prompt tuning</small></div>
+      </div>
+      <div class="rel-feedback-loop">↻ Boucle d'apprentissage → ré-injection dans Scoring & Génération (enrichie par signaux monétisation)</div>
+    </div>
+  </div>
+
+  <!-- Orchestration -->
+  <div class="orchestration" id="orchestration">
+    <button class="orch-header" onclick="toggleOrch()">
+      <span style="font-size:32px">⚙️</span>
+      <div style="flex:1">
+        <div class="orch-title">Orchestration & Automatisation</div>
+        <div class="orch-note">L'orchestrateur connecte TOUS les domaines. Chaque flux (sourcing → scoring → génération) est un scénario/workflow distinct. Les flux solopreneurs ajoutent des scénarios spécifiques (newsletter digest, framework alert, template pipeline).</div>
+      </div>
+      <span class="orch-chevron">▼</span>
+    </button>
+    <div class="orch-body">
+      <div class="orch-card">
+        <h3>Make.com</h3>
+        <p>Scénarios visuels, idéal prototypage rapide, riche en connecteurs. Recommandé pour le MVP 1. <strong style="color:#F0ABFC">+Scénario Substack digest auto (UC16)</strong></p>
+      </div>
+      <div class="orch-card">
+        <h3>n8n</h3>
+        <p>Self-hosted possible, nœuds AI natifs, plus flexible pour la logique complexe. Idéal pour MVP 2+. <strong style="color:#F0ABFC">+Workflow multi-agent scraping niche (UC17/18)</strong></p>
+      </div>
+      <div class="orch-card">
+        <h3>Zapier</h3>
+        <p>Alternative simple, moins puissant pour les flux IA complexes. Backup ou intégrations ponctuelles.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MVP Phasing -->
+  <div class="mvp-section">
+    <div class="mvp-title">📋 Phasage MVP — Quels blocs quand ?</div>
+    <div class="mvp-grid" id="mvpGrid"></div>
+  </div>
+
+  <div class="footer">
+    Trending Content Engine — Architecture fonctionnelle V2 — Formation PO IA & NoCode — Oreegami<br>
+    <span style="color:var(--uc-new)">★</span> Inclut UC16 (Substack/Patreon) · UC17 (Top Voices LinkedIn) · UC18 (Infopreneurs/Formateurs Tech)
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// PERSONAS DATA
+// ══════════════════════════════════════════
+const personas = [
+  {
+    icon: "📰", name: "Responsable éditorial", uc: "MVP original",
+    desc: "Pilote la stratégie de contenu d'une équipe média ou marque.",
+    needs: [
+      { label: "Vue stratégique", color: "#0F766E" },
+      { label: "Priorisation tendances", color: "#DC2626" },
+      { label: "Reporting éditorial", color: "#059669" }
+    ],
+    isNew: false
+  },
+  {
+    icon: "📋", name: "Content Manager", uc: "MVP original",
+    desc: "Coordonne la production et les calendriers éditoriaux.",
+    needs: [
+      { label: "Planning multi-canal", color: "#2563EB" },
+      { label: "Fenêtre de publication", color: "#DC2626" },
+      { label: "Suivi production", color: "#EA580C" }
+    ],
+    isNew: false
+  },
+  {
+    icon: "🔍", name: "Rédacteur SEO", uc: "MVP original",
+    desc: "Produit du contenu optimisé pour la recherche organique.",
+    needs: [
+      { label: "Gap sémantique", color: "#DC2626" },
+      { label: "Brouillons SEO", color: "#EA580C" },
+      { label: "Mots-clés tendance", color: "#0F766E" }
+    ],
+    isNew: false
+  },
+  {
+    icon: "✉️", name: "Auteur Substack / Créateur Patreon", uc: "UC16",
+    desc: "Curation pointue IA Générative & LLMs pour monétiser des newsletters premium et fédérer une communauté de niche.",
+    needs: [
+      { label: "Signaux faibles ArXiv/HN", color: "#7C3AED" },
+      { label: "Curation niche IA", color: "#DC2626" },
+      { label: "Newsletter draft auto", color: "#EA580C" },
+      { label: "Subscriber growth KPIs", color: "#059669" }
+    ],
+    isNew: true
+  },
+  {
+    icon: "💼", name: "Top Voice LinkedIn B2B", uc: "UC17",
+    desc: "Détection de frameworks émergents automatisation & agents IA pour générer de l'inbound et vendre du conseil.",
+    needs: [
+      { label: "Frameworks émergents", color: "#7C3AED" },
+      { label: "Timing thought leadership", color: "#DC2626" },
+      { label: "Post LinkedIn structuré", color: "#EA580C" },
+      { label: "Inbound leads tracking", color: "#059669" }
+    ],
+    isNew: true
+  },
+  {
+    icon: "🎓", name: "Infopreneur / Formateur Tech", uc: "UC18",
+    desc: "Veille sur les nouveaux workflows IA pour créer et lancer des templates/formations avant le mainstream.",
+    needs: [
+      { label: "Nouveaux outils & workflows", color: "#0F766E" },
+      { label: "First-mover window", color: "#DC2626" },
+      { label: "Template & formation draft", color: "#EA580C" },
+      { label: "Monetization potential", color: "#059669" }
+    ],
+    isNew: true
+  }
+];
+
+// ══════════════════════════════════════════
+// DOMAINS DATA (UPDATED FOR UC16-18)
+// ══════════════════════════════════════════
+const domains = [
+  {
+    id: "sourcing", title: "1. SOURCING & COLLECTE", subtitle: "Native Trend Aggregator + Niche Signal Detector",
+    color: "var(--sourcing)", bgColor: "var(--sourcing-bg)", borderColor: "var(--sourcing-border)",
+    rawColor: "#0F766E", icon: "📡",
+    description: "Récupération multi-sources des signaux mainstream ET signaux faibles niche IA/Tech",
+    blocks: [
+      { name: "Flux RSS / Atom", options: ["Google Trends RSS","Feedly API","RSS natif Reddit"], techNote: "Polling toutes les 15-30 min via cron Make.com", status: "" },
+      { name: "APIs Plateformes (mainstream)", options: ["Google Trends API (SerpAPI / Pytrends)","TikTok Creative Center API","X/Twitter API v2 (trending)","YouTube Data API v3","Pinterest Trends (scraping)","Reddit API (hot/rising)"], techNote: "Modules HTTP Make.com ou nœuds HTTP Request n8n", status: "" },
+      { name: "Sources Niche IA & Tech", options: ["ArXiv API (nouveaux papers IA/ML)","Hacker News API (Algolia)","GitHub Trending API","Product Hunt API","Substack Discovery RSS","Hugging Face Daily Papers"], techNote: "Signaux faibles avant le mainstream. Détection de nouveaux modèles, frameworks, outils. Polling quotidien.", status: "new" },
+      { name: "Sources Thought Leadership B2B", options: ["LinkedIn Content API (posts viraux)","LinkedIn Sales Navigator scraping","Newsletter Spy (Substack analytics)","Podcast Index API","Gumroad / Teachable trending"], techNote: "Détection de frameworks émergents, formations qui décollent, contenus B2B à forte traction.", status: "new" },
+      { name: "Scraping léger", options: ["Apify actors","Browse AI","Bardeen","PhantomBuster"], techNote: "Pour les sources sans API officielle (Pinterest, certains médias)", status: "" },
+      { name: "Webhooks entrants", options: ["Webhook Make.com","Webhook n8n","Zapier Catch Hook"], techNote: "Réception de signaux push depuis des outils tiers", status: "" }
+    ],
+    output: "Données brutes normalisées (mainstream + niche) → envoyées au Pré-processing"
+  },
+  {
+    id: "preprocessing", title: "2. PRÉ-PROCESSING & NORMALISATION", subtitle: "Nettoyage, Structuration & Classification niche",
+    color: "var(--preprocessing)", bgColor: "var(--preprocessing-bg)", borderColor: "var(--preprocessing-border)",
+    rawColor: "#7C3AED", icon: "🧹",
+    description: "Nettoyage, dédoublonnage, enrichissement, classification niche IA/Tech et structuration",
+    blocks: [
+      { name: "Base de données centrale (table Trends)", options: ["Airtable (prototypage rapide, UI intégrée)","Supabase (PostgreSQL, plus scalable)","Notion Database (collab légère)"], techNote: "Table unique « Trends » : titre, source, date, volume, catégorie, statut, niche_tags, monetization_signal", status: "updated" },
+      { name: "Dédoublonnage & Merge", options: ["Nœud Merge/Deduplicate n8n","Module Agrégateur Make.com","Logique Airtable (formules + automations)","Script JS inline (Code node n8n)"], techNote: "Clé de dédoublonnage : slug normalisé du sujet + fenêtre temporelle. Cross-source merge (ex: même concept sur ArXiv + HN + LinkedIn).", status: "updated" },
+      { name: "Enrichissement métadonnées", options: ["Appel LLM (catégorisation auto)","Lookup Google Knowledge Graph","Classification mots-clés (regex / NLP)"], techNote: "Ajout : catégorie, langue, zone géo, tags sémantiques", status: "" },
+      { name: "Classification Niche IA/Tech", options: ["Prompt LLM spécialisé (taxonomie IA)","Embeddings + clustering (OpenAI/Cohere)","Table taxonomie Airtable (tags hiérarchiques)","Regex patterns sur termes techniques"], techNote: "Classe chaque trend dans une taxonomie fine : LLM, Agents, RAG, Fine-tuning, Automatisation, NoCode, Infra IA... Permet le filtrage pour UC16/17/18.", status: "new" },
+      { name: "Normalisation des scores bruts", options: ["Formules Airtable / Supabase","Code Node n8n (JS)","Module Math Make.com"], techNote: "Métriques hétérogènes (vues, requêtes, likes, stars GitHub, downloads) → échelle commune 0-100", status: "updated" }
+    ],
+    output: "Trends nettoyées, classifiées & enrichies → prêtes pour le Scoring IA"
+  },
+  {
+    id: "scoring", title: "3. ANALYSE & SCORING IA", subtitle: "Editorial Scorer + Monetization Scorer + First-Mover Index",
+    color: "var(--scoring)", bgColor: "var(--scoring-bg)", borderColor: "var(--scoring-border)",
+    rawColor: "#DC2626", icon: "🎯",
+    description: "Scoring multicritère éditorial + scoring monétisation solopreneur + fenêtre first-mover",
+    blocks: [
+      { name: "Scoring multicritère (Editorial Relevance Scorer)", options: ["Agent IA Claude (API Anthropic)","Agent IA GPT-4 (OpenAI API)","Nœud AI Agent n8n + prompt structuré","Module OpenAI Make.com"], techNote: "5 axes : Volume, Vélocité, Durée de vie, Alignement audience, Compétition → Score 0-100", status: "" },
+      { name: "Monetization Potential Scorer", options: ["Prompt LLM dédié (analyse potentiel commercial)","Règles métier Airtable (TAM niche, intent achat)","Croisement Gumroad/Teachable trending data"], techNote: "Score de monétisabilité 0-100 : le sujet est-il vendable en formation, template, consulting ? Taille de marché niche, intent acheteur détecté, pricing signals.", status: "new" },
+      { name: "First-Mover Advantage Index", options: ["LLM + analyse concurrence (qui a déjà publié ?)","Analyse SERPs (nombre d'articles existants)","GitHub stars velocity + NPM downloads","Scan Substack/Medium (couverture existante)"], techNote: "Indice de fenêtre first-mover : très tôt (opportunité forte) → déjà saturé (passer). Croisé avec le temps de production estimé.", status: "new" },
+      { name: "Analyse sémantique (Semantic Gap Analyzer)", options: ["Prompt LLM dédié (Claude / GPT)","Nœud AI Chain n8n","Perplexity API (analyse concurrence)","SimilarWeb API + LLM"], techNote: "Corpus existant → angles non couverts, formats absents, questions sans réponse. Inclut maintenant l'analyse des newsletters et contenus B2B LinkedIn.", status: "updated" },
+      { name: "Fenêtre de publication (Publication Window Estimator)", options: ["LLM + historique trends (few-shot)","Règles métier (formules Airtable)","Modèle prédictif léger (Code node)"], techNote: "Output étendu : « Publiez dans 4h » / « Fenêtre 2 jours » / « En déclin » + « Lancez la formation dans 2 semaines » (UC18)", status: "updated" },
+      { name: "Matching canal (Channel-Topic Matcher)", options: ["Prompt LLM structuré (JSON output)","Table de mapping Airtable (règles métier)","Logique conditionnelle n8n / Make"], techNote: "Canaux étendus : + Newsletter Substack, + Post LinkedIn thought leadership, + Template Gumroad, + Module de formation, + Thread communauté Patreon/Discord", status: "updated" }
+    ],
+    output: "Trends scorées (editorial + monetization + first-mover) → Dashboard + Génération"
+  },
+  {
+    id: "generation", title: "4. GÉNÉRATION DE CONTENU", subtitle: "Content Draft Engine + Solopreneur Formats",
+    color: "var(--generation)", bgColor: "var(--generation-bg)", borderColor: "var(--generation-border)",
+    rawColor: "#EA580C", icon: "✍️",
+    description: "Production de brouillons multi-formats : articles, posts, newsletters, frameworks, templates de formation",
+    blocks: [
+      { name: "Génération brouillons (formats classiques)", options: ["Claude API (Anthropic)","GPT-4 / GPT-4o (OpenAI)","Mistral API","Nœud AI n8n + prompt template"], techNote: "Brouillons : article SEO, post LinkedIn, script TikTok, thread X, newsletter", status: "" },
+      { name: "Génération Newsletter Premium (UC16)", options: ["Claude API (long-form curation)","Prompt template « newsletter digest »","Beehiiv / Substack API (draft push)","Markdown → HTML converter"], techNote: "Structure : intro hook + 3-5 sujets curés avec analyse + CTA premium. Ton expert-accessible. Adapté au format Substack/Beehiiv.", status: "new" },
+      { name: "Génération Framework & Thought Leadership (UC17)", options: ["Claude API (structured reasoning)","Prompt template « LinkedIn framework post »","Canva API (visual framework)","Mermaid → image (schéma auto)"], techNote: "Formats : post LinkedIn structuré (hook → framework → CTA), carrousel visuel, thread argumenté. Ton « expert qui partage un modèle ».", status: "new" },
+      { name: "Génération Template & Outline Formation (UC18)", options: ["Claude API (curriculum design)","Prompt template « formation module outline »","Notion API (template auto-fill)","Tally / Typeform (quiz de validation)"], techNote: "Formats : outline de formation, template de workflow documenté, checklist actionnable, quiz de validation. Prêt à packager sur Gumroad/Teachable.", status: "new" },
+      { name: "Personnalisation par profil", options: ["Variables de contexte (6 profils éditoriaux)","Prompt dynamique (Make/n8n)","Templates par persona (Airtable)"], techNote: "Ton, longueur, structure adaptés aux 6 personas. Solopreneurs : ton personnel, voix d'auteur, CTA monétisation intégrés.", status: "updated" },
+      { name: "Génération multimodale (MVP2+)", options: ["DALL-E / Midjourney API (visuels)","ElevenLabs (voix)","Runway / Pika (vidéo courte)","Canva API (carrousels LinkedIn)"], techNote: "Visuels, thumbnails, assets sociaux + carrousels LinkedIn (UC17) + covers de formation (UC18)", status: "updated" },
+      { name: "Stockage brouillons", options: ["Airtable (rich text)","Supabase (colonne JSONB)","Google Docs (via API)","Notion (page auto-créée)","Beehiiv draft (via API)"], techNote: "Chaque brouillon lié à sa trend source + score éditorial + score monétisation + canal cible + persona cible", status: "updated" }
+    ],
+    output: "Brouillons multi-formats → Validation humaine via le Dashboard (6 vues persona)"
+  },
+  {
+    id: "interface", title: "5. INTERFACE & EXPÉRIENCE UTILISATEUR", subtitle: "Cockpit éditorial + Solopreneur Dashboard",
+    color: "var(--interface)", bgColor: "var(--interface-bg)", borderColor: "var(--interface-border)",
+    rawColor: "#2563EB", icon: "🖥️",
+    description: "Consultation, décision, validation pour 6 personas avec vues spécialisées solopreneurs",
+    blocks: [
+      { name: "Dashboard des tendances", options: ["Softr (connecté Airtable)","Retool (connecté Supabase)","Appsmith","Bubble","Glide (mobile-first)"], techNote: "Liste trends scorées. Ajout : colonne Score Monétisation, badge First-Mover, filtre par niche IA/Tech.", status: "updated" },
+      { name: "Vue Solopreneur Cockpit", options: ["Vue dédiée Softr (filtres pré-configurés)","Dashboard Retool (widgets monétisation)","Bubble page spécifique (solopreneur mode)"], techNote: "Vue spécialisée : trends triées par potentiel de monétisation, indice first-mover visible, formats solopreneur en priorité. Switch entre vue « curation » (UC16), « framework » (UC17), « template » (UC18).", status: "new" },
+      { name: "Vue détail Trend (enrichie)", options: ["Page détail Softr/Retool","Modal Bubble","Expandable row Appsmith"], techNote: "Score détaillé (5 axes éditoriaux + monétisation + first-mover), sources, gap sémantique, fenêtre, brouillons par format.", status: "updated" },
+      { name: "Actions utilisateur", options: ["Boutons Softr (Valider/Rejeter/Modifier)","Formulaire inline Retool","Workflow buttons Bubble","Quick actions (« Envoyer en draft Substack », « Publier sur LinkedIn »)"], techNote: "Valider → production | Rejeter → feedback | Modifier → édition. Nouveau : « Push to newsletter » (UC16), « Draft LinkedIn post » (UC17), « Create template » (UC18).", status: "updated" },
+      { name: "Filtrage par profil (6 personas)", options: ["Filtres Softr + vues sauvegardées","Rôles & permissions Retool","Segmentation Bubble par user type","Onboarding persona selector"], techNote: "6 vues : Resp. Edito → stratégique | Content Mgr → planning | Rédacteur → production | Substack → curation niche | LinkedIn → frameworks | Formateur → templates", status: "updated" }
+    ],
+    output: "Décisions, feedback & actions directes → moteur d'apprentissage + plateformes de publication"
+  },
+  {
+    id: "feedback", title: "6. FEEDBACK & APPRENTISSAGE", subtitle: "Boucle continue + Signaux monétisation",
+    color: "var(--feedback)", bgColor: "var(--feedback-bg)", borderColor: "var(--feedback-border)",
+    rawColor: "#059669", icon: "🔄",
+    description: "Retours utilisateurs, métriques de monétisation et amélioration progressive du scoring",
+    blocks: [
+      { name: "Collecte des feedbacks", options: ["Champ rating Airtable (1-5)","Formulaire Tally / Typeform intégré","Boutons like/dislike Dashboard"], techNote: "Chaque action (valider, rejeter, modifier) = signal d'apprentissage", status: "" },
+      { name: "Signaux de monétisation post-publication", options: ["Substack API (open rate, subscribers, revenue)","LinkedIn API (impressions, engagement, DMs reçus)","Gumroad/Teachable API (ventes, revenue)","Beehiiv analytics API","Webhook Stripe (revenus directs)"], techNote: "Boucle de feedback enrichie : le système apprend non seulement de la décision de l'utilisateur mais aussi du résultat commercial réel. Corrélation trend → revenus.", status: "new" },
+      { name: "Stockage des décisions", options: ["Table « Decisions » Airtable","Table PostgreSQL Supabase","Log structuré (JSON)"], techNote: "Historique enrichi : trend_id, action, persona, motif, date, revenue_generated, subscribers_gained, engagement_rate", status: "updated" },
+      { name: "Amélioration des prompts", options: ["Few-shot learning","Prompt versioning (Airtable)","Fine-tuning léger (OpenAI / Claude)","Reinforcement from monetization signals"], techNote: "Trends validées + revenue élevé = exemples positifs fortement pondérés. Le système apprend à prioriser les sujets qui génèrent du revenu, pas seulement de l'engagement.", status: "updated" },
+      { name: "Reporting & Analytics", options: ["Dashboard Metabase","Vues agrégées Airtable","Google Data Studio","Charts intégrés Retool"], techNote: "KPIs étendus : taux validation, temps décision, précision scoring + revenue par trend, ROI par canal solopreneur, growth rate subscribers, conversion rate formation", status: "updated" }
+    ],
+    output: "Signaux d'apprentissage (éditorial + monétisation) → ré-injectés dans Scoring & Génération"
+  }
+];
+
+// ══════════════════════════════════════════
+// MVP DATA (UPDATED)
+// ══════════════════════════════════════════
+const mvps = [
+  { phase: "MVP 1 — Prototype", color: "#0F766E", items: [
+    { text: "1 source mainstream (Google Trends RSS)", isNew: false },
+    { text: "1 source niche (Hacker News API)", isNew: true },
+    { text: "Pré-processing basique (Airtable) + niche tags", isNew: false },
+    { text: "Scoring IA simplifié (1 prompt LLM)", isNew: false },
+    { text: "Dashboard lecture seule (Softr) — 6 vues persona", isNew: true },
+    { text: "Feedback binaire (👍/👎)", isNew: false }
+  ]},
+  { phase: "MVP 2 — Recommandation", color: "#7C3AED", items: [
+    { text: "+2 sources mainstream (TikTok, Reddit)", isNew: false },
+    { text: "+3 sources niche (ArXiv, GitHub, LinkedIn)", isNew: true },
+    { text: "Scoring multicritère + Monetization Scorer", isNew: true },
+    { text: "Channel-Topic Matcher (9+ formats)", isNew: false },
+    { text: "Génération brouillons : articles + newsletters + frameworks", isNew: true },
+    { text: "Actions Dashboard + push Substack/LinkedIn", isNew: true }
+  ]},
+  { phase: "MVP 3 — Produit mature", color: "#DC2626", items: [
+    { text: "Toutes sources agrégées", isNew: false },
+    { text: "Semantic Gap Analyzer + First-Mover Index", isNew: true },
+    { text: "Publication Window Estimator (incl. formation launch)", isNew: true },
+    { text: "Feedback loop enrichi (revenus, subscribers)", isNew: true },
+    { text: "Analytics : ROI par trend, revenue par canal", isNew: true },
+    { text: "Template & formation generation (UC18)", isNew: true }
+  ]}
+];
+
+// ══════════════════════════════════════════
+// UC IMPACT MAP DATA
+// ══════════════════════════════════════════
+const impactMap = [
+  {
+    domain: "1. Sourcing", color: "#0F766E",
+    changes: [
+      { text: "ArXiv API, Hacker News, GitHub Trending, Hugging Face Daily Papers", ucs: ["UC16","UC17","UC18"] },
+      { text: "LinkedIn Content API, Newsletter Spy, Podcast Index", ucs: ["UC17"] },
+      { text: "Gumroad/Teachable trending, Product Hunt API", ucs: ["UC18"] }
+    ]
+  },
+  {
+    domain: "2. Pré-processing", color: "#7C3AED",
+    changes: [
+      { text: "Classification niche IA/Tech (taxonomie fine : LLM, Agents, RAG, etc.)", ucs: ["UC16","UC17","UC18"] },
+      { text: "Champs enrichis : niche_tags, monetization_signal", ucs: ["UC16","UC17","UC18"] },
+      { text: "Cross-source merge (même concept ArXiv + HN + LinkedIn)", ucs: ["UC16","UC17"] }
+    ]
+  },
+  {
+    domain: "3. Scoring IA", color: "#DC2626",
+    changes: [
+      { text: "Monetization Potential Scorer (vendable en formation/template/conseil ?)", ucs: ["UC17","UC18"] },
+      { text: "First-Mover Advantage Index (fenêtre d'opportunité niche)", ucs: ["UC16","UC18"] },
+      { text: "Fenêtre étendue : « Lancez la formation dans 2 semaines »", ucs: ["UC18"] },
+      { text: "Canaux étendus : Newsletter, Framework post, Template, Module formation", ucs: ["UC16","UC17","UC18"] }
+    ]
+  },
+  {
+    domain: "4. Génération", color: "#EA580C",
+    changes: [
+      { text: "Newsletter premium auto (intro hook + sujets curés + CTA)", ucs: ["UC16"] },
+      { text: "Framework & thought leadership post LinkedIn", ucs: ["UC17"] },
+      { text: "Template de workflow + outline de formation", ucs: ["UC18"] },
+      { text: "Personnalisation 6 personas, ton voix d'auteur, CTA monétisation", ucs: ["UC16","UC17","UC18"] }
+    ]
+  },
+  {
+    domain: "5. Interface", color: "#2563EB",
+    changes: [
+      { text: "Vue Solopreneur Cockpit (curation / framework / template modes)", ucs: ["UC16","UC17","UC18"] },
+      { text: "Score Monétisation + badge First-Mover dans le Dashboard", ucs: ["UC16","UC17","UC18"] },
+      { text: "Quick actions : Push Substack, Draft LinkedIn, Create template", ucs: ["UC16","UC17","UC18"] }
+    ]
+  },
+  {
+    domain: "6. Feedback", color: "#059669",
+    changes: [
+      { text: "Signaux monétisation post-publication (revenue, subscribers, ventes)", ucs: ["UC16","UC17","UC18"] },
+      { text: "Corrélation trend → revenus pour enrichir le scoring", ucs: ["UC17","UC18"] },
+      { text: "KPIs étendus : ROI/trend, revenue/canal, growth subscribers", ucs: ["UC16","UC17","UC18"] }
+    ]
+  }
+];
+
+// ══════════════════════════════════════════
+// BUILD PERSONAS GRID
+// ══════════════════════════════════════════
+const personasGrid = document.getElementById('personasGrid');
+personas.forEach(p => {
+  const card = document.createElement('div');
+  card.className = 'persona-card' + (p.isNew ? ' is-new' : '');
+  card.innerHTML = `
+    <div class="persona-icon">${p.icon}</div>
+    <div class="persona-name">${p.name}</div>
+    <div class="persona-uc">${p.uc}</div>
+    <div class="persona-desc">${p.desc}</div>
+    <div class="persona-needs">
+      ${p.needs.map(n => `<span class="persona-need-tag" style="background:${n.color}12;color:${n.color};border:1px solid ${n.color}22">${n.label}</span>`).join('')}
+    </div>
+  `;
+  personasGrid.appendChild(card);
+});
+
+// ══════════════════════════════════════════
+// BUILD FLOW BAR
+// ══════════════════════════════════════════
+const flowBar = document.getElementById('flowBar');
+domains.forEach((d, i) => {
+  const pill = document.createElement('div');
+  pill.className = 'flow-pill';
+  pill.style.background = d.rawColor;
+  pill.textContent = d.icon + ' ' + d.id.charAt(0).toUpperCase() + d.id.slice(1);
+  pill.onclick = () => toggleDomain(d.id);
+  flowBar.appendChild(pill);
+  if (i < domains.length - 1) {
+    const arrow = document.createElement('span');
+    arrow.className = 'flow-arrow';
+    arrow.textContent = '→';
+    flowBar.appendChild(arrow);
+  }
+});
+const loop = document.createElement('span');
+loop.className = 'flow-arrow';
+loop.textContent = '↻';
+flowBar.appendChild(loop);
+
+// ══════════════════════════════════════════
+// BUILD DOMAIN CARDS
+// ══════════════════════════════════════════
+const cardsContainer = document.getElementById('domainCards');
+domains.forEach((d, idx) => {
+  const card = document.createElement('div');
+  card.className = 'domain-card' + (idx === 0 ? ' expanded' : '');
+  card.id = 'card-' + d.id;
+  card.style.background = d.bgColor;
+  card.style.border = `2px solid ${d.borderColor}`;
+
+  let blocksHTML = d.blocks.map(b => {
+    let cardClass = 'block-card';
+    if (b.status === 'new') cardClass += ' is-new-block';
+    if (b.status === 'updated') cardClass += ' is-updated-block';
+    return `
+    <div class="${cardClass}" style="border:1px solid ${d.borderColor}">
+      <div class="block-name" style="color:${d.rawColor};border-bottom:2px solid ${d.borderColor}">${b.name}</div>
+      <div>${b.options.map(o => {
+        const isNewTag = b.status === 'new';
+        return `<span class="tech-tag${isNewTag ? ' is-new-tag' : ''}" style="${isNewTag ? '' : `background:${d.rawColor}10;color:${d.rawColor};border:1px solid ${d.rawColor}22`}">${o}</span>`;
+      }).join('')}</div>
+      <div class="block-note">💡 ${b.techNote}</div>
+    </div>
+  `}).join('');
+
+  card.innerHTML = `
+    <button class="domain-header" onclick="toggleDomain('${d.id}')">
+      <span class="domain-icon">${d.icon}</span>
+      <div style="flex:1">
+        <div class="domain-title" style="color:${d.rawColor}">${d.title}</div>
+        <div class="domain-subtitle">${d.subtitle} — ${d.description}</div>
+      </div>
+      <span class="domain-chevron" style="color:${d.rawColor}">▼</span>
+    </button>
+    <div class="domain-body">
+      <div class="blocks-grid">${blocksHTML}</div>
+      <div class="domain-output" style="background:${d.rawColor}0D;color:${d.rawColor};border-left-color:${d.rawColor}">
+        ➜ OUTPUT : ${d.output}
+      </div>
+    </div>
+  `;
+  cardsContainer.appendChild(card);
+});
+
+// ══════════════════════════════════════════
+// BUILD IMPACT MAP
+// ══════════════════════════════════════════
+const impactGrid = document.getElementById('impactGrid');
+impactMap.forEach(im => {
+  const card = document.createElement('div');
+  card.className = 'impact-card';
+  const ucBadge = (uc) => {
+    const cls = uc === 'UC16' ? 'uc16' : uc === 'UC17' ? 'uc17' : 'uc18';
+    return `<span class="impact-uc-badge ${cls}">${uc}</span>`;
+  };
+  card.innerHTML = `
+    <div class="impact-card-header">
+      <div class="impact-domain-dot" style="background:${im.color}"></div>
+      <div class="impact-domain-name">${im.domain}</div>
+    </div>
+    <ul class="impact-changes">
+      ${im.changes.map(c => `<li>${c.text} ${c.ucs.map(ucBadge).join(' ')}</li>`).join('')}
+    </ul>
+  `;
+  impactGrid.appendChild(card);
+});
+
+// ══════════════════════════════════════════
+// BUILD MVP GRID
+// ══════════════════════════════════════════
+const mvpGrid = document.getElementById('mvpGrid');
+mvps.forEach(m => {
+  const card = document.createElement('div');
+  card.className = 'mvp-card';
+  card.style.border = `2px solid ${m.color}22`;
+  card.style.background = `${m.color}06`;
+  card.innerHTML = `
+    <h3 style="color:${m.color}">${m.phase}</h3>
+    ${m.items.map(item => `<div class="mvp-item${item.isNew ? ' is-new-item' : ''}"><span class="mvp-bullet" style="color:${item.isNew ? 'var(--uc-new)' : m.color}">•</span>${item.isNew ? '★ ' : ''}${item.text}</div>`).join('')}
+  `;
+  mvpGrid.appendChild(card);
+});
+
+// ══════════════════════════════════════════
+// INTERACTIONS
+// ══════════════════════════════════════════
+function toggleDomain(id) {
+  document.getElementById('card-' + id).classList.toggle('expanded');
+}
+
+function toggleOrch() {
+  document.getElementById('orchestration').classList.toggle('expanded');
+}
+
+function expandAll() {
+  domains.forEach(d => document.getElementById('card-' + d.id).classList.add('expanded'));
+  document.getElementById('orchestration').classList.add('expanded');
+}
+
+function collapseAll() {
+  domains.forEach(d => document.getElementById('card-' + d.id).classList.remove('expanded'));
+  document.getElementById('orchestration').classList.remove('expanded');
+}
+
+function highlightNew() {
+  // Expand all to show new blocks
+  expandAll();
+  // Scroll to first new block
+  setTimeout(() => {
+    const firstNew = document.querySelector('.is-new-block');
+    if (firstNew) firstNew.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 400);
+}
+</script>
+
+</body>
+</html>
